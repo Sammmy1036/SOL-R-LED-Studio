@@ -1,0 +1,208 @@
+SOL-R LED STUDIO - LICENSE, DISCLOSURES AND DISCLAIMER
+======================================================
+
+PLEASE READ CAREFULLY. By installing, copying, or using SOL-R LED Studio (the
+"Software"), you agree to all of the terms below. If you do not agree, do not
+install or use the Software.
+
+
+1. LICENSE GRANT
+----------------
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+the Software and associated documentation files, to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+  a) This entire file (license, disclosures and disclaimer) shall be included
+     in all copies or substantial portions of the Software.
+  b) The third-party notices in Section 9 must be preserved.
+
+
+2. NO AFFILIATION WITH THRUSTMASTER
+-----------------------------------
+
+The Software is an independent, unofficial community project. It is NOT made,
+affiliated with, endorsed, sponsored, approved, or supported by Thrustmaster,
+Guillemot Corporation S.A., or any of their subsidiaries or affiliates
+(together, "Thrustmaster"). Thrustmaster, SOL-R, T.A.R.G.E.T. and related names
+and logos are trademarks or registered trademarks of their respective owners
+and are used here only to describe the hardware the Software works with.
+
+Thrustmaster does not provide support for the Software. Do not contact
+Thrustmaster about issues caused by or related to the Software. Use of the
+Software may affect the support or warranty the manufacturer provides for
+your hardware.
+
+
+3. WHAT THE SOFTWARE DOES TO YOUR SYSTEM
+----------------------------------------
+
+The Software works by communicating directly with the LED hardware of
+Thrustmaster SOL-R flightsticks. To do this, it makes the following changes to
+your computer and devices. Several of these require administrator rights.
+
+3.1 Driver installation (Microsoft WinUSB)
+    During installation, or when you click "Set up LED driver" in the
+    Software, or when the Software is run with --install-driver, the Software:
+      - locates each connected SOL-R stick's vendor-specific LED interface
+        (USB interface MI_01, USB IDs 044F:042A and 044F:0422);
+      - changes that interface's device setup class to "Universal Serial Bus
+        devices";
+      - installs Microsoft's WinUSB driver (winusb.inf, supplied with and
+        signed as part of Microsoft Windows) on that interface using the
+        Windows Setup API;
+      - writes a "DeviceInterfaceGUIDs" value to that interface's registry key
+        under HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\...\Device Parameters;
+      - restarts that interface using the Windows "pnputil" tool.
+    The joystick interface of the stick (MI_00, used for axes and buttons) is
+    not modified by the Software. No drivers other than Microsoft's WinUSB are
+    installed. A log of these steps is written to
+    %APPDATA%\SolR-LED\driver-setup.log.
+
+3.2 Driver removal
+    When the Software is uninstalled, or run with --uninstall-driver, it
+    removes the device entries for SOL-R LED interfaces that use WinUSB
+    (using "pnputil /remove-device") and asks Windows to rescan for hardware,
+    returning those interfaces to their prior driverless state. Removal may
+    not succeed in every configuration; you can also remove the driver
+    manually in Windows Device Manager.
+
+3.3 Communication with your hardware
+    The Software sends unofficial USB commands to your SOL-R sticks to change
+    LED colors and brightness, and to run lighting effects, which send a
+    continuous stream of commands while active. These commands are based on
+    independent, community reverse engineering and are not documented,
+    tested, or supported by Thrustmaster. Firmware indicator lights (such as
+    D1/D2) may flicker while effects run.
+
+3.4 Files and settings
+    The Software stores its settings, profiles and logs in
+    %APPDATA%\SolR-LED\. If you enable "Start with Windows", it creates a
+    startup entry in your Windows Startup folder. The installer places program
+    files in the installation folder you choose and creates shortcuts.
+
+3.5 Process monitoring
+    If "Switch profiles for games" is enabled, the Software periodically reads
+    the names of running programs on your computer to detect the games you
+    have chosen. This information is used only locally and is never stored
+    beyond your chosen trigger list or transmitted anywhere.
+
+3.6 Networking
+    The Software does not send data over the internet and contains no
+    telemetry. It opens a local-only connection on 127.0.0.1 (port 47612)
+    solely to prevent more than one copy from running at the same time.
+
+3.7 Possible side effects
+    Because the LED interface is assigned to WinUSB, other software that
+    expects to use that interface (for example, manufacturer tools or
+    firmware updaters) may not be able to access it while the Software's
+    driver setup is in place. Only one program at a time can use the LED
+    interface.
+
+
+4. USE AT YOUR OWN RISK
+-----------------------
+
+You use the Software entirely at your own risk. You are solely responsible
+for deciding whether the Software is suitable for your use, for any changes
+it makes to your computer or devices, and for backing up your system and data
+before use. You acknowledge that modifying device drivers and sending
+unofficial commands to hardware carries inherent risks, including but not
+limited to device malfunction, loss of functionality, system instability,
+data loss, and effects on manufacturer warranty or support.
+
+
+5. DISCLAIMER OF WARRANTY
+-------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND
+NON-INFRINGEMENT. NO WARRANTY IS MADE THAT THE SOFTWARE WILL BE ERROR-FREE,
+SECURE, OR UNINTERRUPTED, WILL WORK WITH ANY PARTICULAR HARDWARE, FIRMWARE OR
+SOFTWARE VERSION, OR WILL NOT CAUSE DAMAGE TO YOUR HARDWARE, SOFTWARE OR DATA.
+
+
+6. LIMITATION OF LIABILITY
+--------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+AUTHORS, COPYRIGHT HOLDERS, OR CONTRIBUTORS OF THE SOFTWARE BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
+(INCLUDING NEGLIGENCE) OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE, INCLUDING
+BUT NOT LIMITED TO ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+EXEMPLARY OR PUNITIVE DAMAGES; DAMAGE TO OR MALFUNCTION OF HARDWARE OR
+PERIPHERALS; LOSS OF DATA, USE OR PROFITS; SYSTEM FAILURE; OR COSTS OF REPAIR
+OR REPLACEMENT, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+
+7. RELEASE AND INDEMNITY
+------------------------
+
+By using the Software, you release the authors, copyright holders and
+contributors of the Software from any and all claims, demands and liabilities
+arising from or related to your installation or use of the Software, and you
+agree to indemnify and hold them harmless from any claims by third parties
+arising from your use, modification or distribution of the Software.
+
+
+8. APPLICABLE LAW
+-----------------
+
+Some jurisdictions do not allow the exclusion of certain warranties or the
+limitation of certain liabilities. In those jurisdictions, the exclusions and
+limitations above apply to the fullest extent permitted by law. If any part
+of this document is held unenforceable, the remaining parts remain in effect.
+
+
+9. THIRD-PARTY NOTICES
+----------------------
+
+The Software's LED control is based on the SOL-R LED protocol reverse
+engineered by gort818 (https://github.com/gort818/solr-led), used under the
+following license:
+
+    MIT License
+
+    Copyright (c) 2025 Alessandro Toia
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to permit
+    persons to whom the Software is furnished to do so, subject to the
+    following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+    NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+    DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+    USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The distributed program (SolR-LED.exe) also includes the following
+third-party components, each governed by its own license:
+
+  - Python runtime ............. Python Software Foundation License
+  - libusb ..................... GNU LGPL v2.1  (https://libusb.info)
+  - libusb-package ............. Apache License 2.0
+  - pyusb ...................... BSD 3-Clause License
+  - CustomTkinter .............. MIT License
+  - Pillow ..................... MIT-CMU (HPND) License
+  - pystray .................... GNU LGPL v3
+
+Source code for the LGPL-licensed components is available from their
+respective projects. The Software's own source code is available from its
+GitHub repository, allowing these components to be replaced or relinked.
+
+Microsoft, Windows and WinUSB are trademarks of Microsoft Corporation. The
+WinUSB driver is part of Microsoft Windows and is not distributed with the
+Software.
