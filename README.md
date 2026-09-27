@@ -172,7 +172,6 @@ Command-line options:
 
 | Option | What it does |
 |---|---|
-| *(none)* | Open the app, or bring the running copy to the front |
 | `--tray` | Start hidden in the system tray |
 | `--install-driver` | One-time LED driver setup (run as administrator) |
 | `--uninstall-driver` | Undo the driver setup (run as administrator) |
