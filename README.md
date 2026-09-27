@@ -1,6 +1,6 @@
 # SOL-R LED Studio
 
-**Custom RGB lighting for the Thrustmaster SOL-R 2 HOSAS flightsticks on Windows.**
+**Custom RGB lighting for the Thrustmaster SOL-R 2 flightsticks on Windows.**
 
 SOL-R LED Studio lets you set the color of every individually addressable LED on both SOL-R sticks, save lighting profiles, run animated effects, and switch profiles automatically when a game launches. It needs no T.A.R.G.E.T. scripts or control-panel tricks, and it doesn't interfere with how your games, vJoy, or HidHide see the sticks.
 
