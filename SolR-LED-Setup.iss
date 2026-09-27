@@ -24,6 +24,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\SolR-LED.ico
+UninstallDisplayName={#AppName}
 SetupIconFile=SolR-LED.ico
 LicenseFile=LICENSE.txt
 VersionInfoVersion={#AppVersion}
