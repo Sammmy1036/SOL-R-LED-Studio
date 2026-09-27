@@ -155,7 +155,6 @@ To stay reliable, the app keeps one open handle per stick, paces its packets, dr
 | Stick shows **In use by another app** | Close any other tool using the LEDs (only one program at a time) |
 | Colors don't change after replugging into a different USB port | Click **Rescan devices**. If it says Setup needed, run the setup again |
 | Driver setup failed | Check `%APPDATA%\SolR-LED\driver-setup.log` |
-| Old icon still showing after an update | Run `ie4uinit.exe -show` to refresh the Windows icon cache |
 
 ---
 
