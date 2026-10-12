@@ -62,6 +62,11 @@ ENDPOINT_OUT = 0x02
 PACKET_GAP = 0.015
 WRITE_TIMEOUT = 500
 RETRIES = 3
+LIBUSB_ERROR_TIMEOUT = -7
+
+RESUME_SETTLE = 4.0   # seconds of no USB traffic after the PC wakes from sleep
+APPEAR_SETTLE = 2.0   # a stick must be present this long before we open it
+ERROR_REPROBE = 5.0   # seconds between automatic retries for a stick in an error state
 
 LED_NAMES = {
     0x00: "Thumbstick",
@@ -136,12 +141,12 @@ def effect_frame(prof, t):
     mode = prof.get("effect", "static")
     f = 0.15 + prof.get("speed", 40) / 100 * 1.85
     out = {}
-    for si, side in enumerate(("left", "right")):
+    for side in ("left", "right"):
         frame = {}
         for led in ALL_LEDS:
             base = bytes.fromhex(prof[side][f"{led:02X}"][1:])
             x, y = LED_POS[led]
-            gx = x + si * 360  # continuous x across both sticks
+            gx = x  # same position math on both sticks, so effects mirror exactly
             k = 1.0
             color = None
             if mode == "breathing":
@@ -155,7 +160,7 @@ def effect_frame(prof, t):
                     dist = (head - RING_ORDER.index(led)) % 8
                     k = max(0.08, 1 - dist / 3.5)
             elif mode == "twinkle":
-                ph, rate = _TWINKLE[(si, led)]
+                ph, rate = _TWINKLE[(0, led)]  # same twinkle timing on both sticks
                 k = 0.15 + 0.85 * max(0.0, math.sin(2 * math.pi * (t * f * rate * 0.5 + ph))) ** 6
             elif mode == "spectrum":
                 color = colorsys.hsv_to_rgb((t * f * 0.07) % 1, 1, 1)
@@ -183,12 +188,19 @@ def build_packets(colors):
     if 0x00 in colors:
         packets.append(bytes([0x01, 0x88, 0x81, 0xFF, 0x00]) + colors[0x00])
     others = [led for led in colors if led != 0x00]
+    if len(others) % 2:
+        others.append(others[-1])  # every 0x85 packet carries exactly two entries
     for i in range(0, len(others), 2):
-        pkt = bytes([0x01, 0x08, 0x85, 0xFF])
-        for led in others[i:i + 2]:
-            pkt += bytes([led]) + colors[led]
-        packets.append(pkt)
+        a, b = others[i], others[i + 1]
+        packets.append(bytes([0x01, 0x08, 0x85, 0xFF, a]) + colors[a] + bytes([b]) + colors[b])
     return packets
+
+
+def _is_timeout(e):
+    timeout_cls = getattr(usb.core, "USBTimeoutError", None)
+    if timeout_cls is not None and isinstance(e, timeout_cls):
+        return True
+    return getattr(e, "backend_error_code", None) == LIBUSB_ERROR_TIMEOUT
 
 
 class SolRIO:
@@ -198,7 +210,7 @@ class SolRIO:
         self._backend = None
         self._open = {}
         self._last = {}      # side -> {led: bytes} last colors the stick accepted
-        self.gap = 0.010     # seconds between packets; grows if the stick struggles
+        self.gap = PACKET_GAP  # seconds between packets; grows if the stick struggles
 
     def backend(self):
         if self._backend is None:
@@ -296,36 +308,69 @@ class SolRIO:
                 return "error", "In use by another app"
             return "error", "LED interface unavailable"
 
-    def write(self, side, colors, force=False):
-        last = self._last.get(side, {})
-        if not force:
-            colors = {l: c for l, c in colors.items() if last.get(l) != c}
-        if not colors:
-            return
-        h = self._get(side)
-        try:
-            for pkt in build_packets(colors):
-                data = _interop.as_array(pkt)
-                for attempt in range(RETRIES):
+    def _send_packet(self, h, pkt):
+        data = _interop.as_array(pkt)
+        for attempt in range(RETRIES):
+            try:
+                h["write"](h["handle"], ENDPOINT_OUT, INTERFACE, data, WRITE_TIMEOUT)
+                break
+            except usb.core.USBError as e:
+                if attempt == RETRIES - 1:
+                    raise
+                self.gap = min(0.03, self.gap + 0.003)  # back off
+                timed_out = _is_timeout(e)
+                if not timed_out:  # only clear a real stall, never a busy stick
                     try:
-                        h["write"](h["handle"], ENDPOINT_OUT, INTERFACE, data, WRITE_TIMEOUT)
-                        break
-                    except usb.core.USBError:
-                        if attempt == RETRIES - 1:
-                            raise
-                        self.gap = min(0.03, self.gap + 0.003)  # back off
-                        self._drain(h)
-                        try:
-                            h["be"].clear_halt(h["handle"], ENDPOINT_OUT)
-                        except Exception:
-                            pass
-                        time.sleep(0.05)
+                        h["be"].clear_halt(h["handle"], ENDPOINT_OUT)
+                    except Exception:
+                        pass
+                time.sleep(0.1 if timed_out else 0.05)
                 self._drain(h)
+        self._drain(h)
+
+    def write_many(self, jobs):
+        """jobs: {side: (colors, force)}. Sends the sticks' packets interleaved
+        (L, R, L, R, ...) so effects stay in step across both sticks, while only
+        one USB transfer is ever in flight. Returns {side: None or exception}."""
+        results, queues = {}, {}
+        for side, (colors, force) in jobs.items():
+            last = self._last.get(side, {})
+            if not force:
+                colors = {l: c for l, c in colors.items() if last.get(l) != c}
+            if not colors:
+                results[side] = None
+                continue
+            try:
+                h = self._get(side)
+            except Exception as e:
+                results[side] = e
+                continue
+            queues[side] = (h, colors, build_packets(colors))
+
+        i = 0
+        while queues:
+            for side in list(queues):
+                h, colors, pkts = queues[side]
+                try:
+                    self._send_packet(h, pkts[i])
+                except Exception as e:
+                    self.close(side)
+                    results[side] = e
+                    del queues[side]
+                    continue
+                if i == len(pkts) - 1:  # this stick's frame is complete
+                    self._last.setdefault(side, {}).update(colors)
+                    results[side] = None
+                    del queues[side]
+            if queues:
                 time.sleep(self.gap)
-            self._last.setdefault(side, {}).update(colors)
-        except Exception:
-            self.close(side)
-            raise
+            i += 1
+        return results
+
+    def write(self, side, colors, force=False):
+        err = self.write_many({side: (colors, force)})[side]
+        if err is not None:
+            raise err
 
 
 # ============================================================================
@@ -1004,6 +1049,8 @@ class App:
         self.h, self.s, self.v = 0.07, 1.0, 1.0
         self._save_job = self._bright_job = None
         self._identifying = False
+        self._seen = {}         # side -> time it reappeared while marked missing
+        self._reprobe_at = {}   # side -> last automatic re-probe (setup / error states)
         self.tray = None
         self._sync_watch_state()
 
@@ -1921,33 +1968,62 @@ class App:
             self.ui_q.put(("devices",))
 
     def _check_presence(self):
-        """Runs ~every 0.75 s: catches unplug/replug without waiting for a write."""
+        """Runs ~every 0.75 s: catches unplug/replug without waiting for a write.
+        A stick that (re)appears must stay present for APPEAR_SETTLE seconds before
+        we open it, so we never talk to firmware that is still starting up."""
         try:
             present = self.io.present()
         except Exception:
             return []
+        now = time.time()
         jobs = []
         for side in ("left", "right"):
             state = self.status[side][0]
-            if side not in present and state != "missing":
-                self.io.close(side)
-                self._set_status(side, "missing", "Disconnected")
-            elif side in present and state == "missing":
-                jobs.append(("probe_side", side, None))
-            elif side in present and state == "setup" and time.time() - getattr(self, "_last_setup_probe", 0) > 5:
-                self._last_setup_probe = time.time()
+            if side not in present:
+                self._seen.pop(side, None)
+                if state != "missing":
+                    self.io.close(side)
+                    self._set_status(side, "missing", "Disconnected")
+            elif state == "missing":
+                first = self._seen.setdefault(side, now)
+                if now - first >= APPEAR_SETTLE:
+                    self._seen.pop(side, None)
+                    jobs.append(("probe_side", side, None))
+            elif state in ("setup", "error") and now - self._reprobe_at.get(side, 0) > ERROR_REPROBE:
+                self._reprobe_at[side] = now
                 jobs.append(("probe_side", side, None))
         return jobs
 
+    def _on_resume(self):
+        """PC just woke from sleep: drop every handle and treat both sticks as gone,
+        so they get reopened fresh once they've settled."""
+        self.io.close_all()
+        self._seen.clear()
+        for side in ("left", "right"):
+            self._set_status(side, "missing", "Waking up…")
+
     def _usb_worker(self):
         last_check = 0
+        settle_until = 0
         while True:
+            waited_from = time.time()
             try:
                 jobs = [self.jobs.get(timeout=0.25)]
             except queue.Empty:
                 jobs = []
-            if time.time() - last_check > 0.75:
-                last_check = time.time()
+            now = time.time()
+            if now - waited_from > 5:  # a 0.25 s wait took >5 s: the PC was asleep
+                self._on_resume()
+                settle_until = now + RESUME_SETTLE
+            if now < settle_until:
+                while True:  # drop anything queued around sleep, it's stale
+                    try:
+                        self.jobs.get_nowait()
+                    except queue.Empty:
+                        break
+                continue
+            if now - last_check > 0.75:
+                last_check = now
                 jobs += self._check_presence()
             if not jobs:
                 continue
@@ -1978,21 +2054,16 @@ class App:
                     if kind == "force":
                         forced.add(a)
 
-            def send(side, payload):
-                try:
-                    self.io.write(side, payload, force=side in forced)
+            # Interleaved L/R packets: sticks stay in sync, one transfer in flight at a time.
+            results = self.io.write_many({side: (payload, side in forced) for side, payload in merged.items()})
+            for side, err in results.items():
+                if err is None:
                     self._set_status(side, "ok", "Connected")
-                except LookupError:
+                elif isinstance(err, LookupError):
                     self._set_status(side, "missing", "Disconnected")
-                except Exception as e:
+                else:
                     self._set_status(side, "error", "Write failed")
-                    self.ui_q.put(("hint", f"{side.title()} stick write failed: {e}"))
-
-            threads = [threading.Thread(target=send, args=item) for item in merged.items()]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
+                    self.ui_q.put(("hint", f"{side.title()} stick write failed: {err}"))
 
     # ------------------------------------------------------------ tray & misc
     def _start_tray(self):
