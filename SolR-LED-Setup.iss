@@ -5,7 +5,7 @@
 ; 3. Output: Output\SolR-LED-Setup.exe
 
 #define AppName "SOL-R LED Studio"
-#define AppVersion "1.0.0.0"
+#define AppVersion "1.0.0.1"
 #define AppExe "SolR-LED.exe"
 
 [Setup]
